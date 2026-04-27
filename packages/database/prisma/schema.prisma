@@ -1,0 +1,303 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// User & Auth
+// ==========================================
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relacionamentos
+  workspaces    WorkspaceMember[]
+  auditLogs     AuditLog[]
+}
+
+// ==========================================
+// Multitenancy (Workspaces)
+// ==========================================
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  members       WorkspaceMember[]
+  brands        Brand[]
+  creditWallet  CreditWallet?
+  auditLogs     AuditLog[]
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role     @default(VIEWER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+// ==========================================
+// Marcas & Identidade
+// ==========================================
+model Brand {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  niche       String?
+  audience    String?
+  toneOfVoice String?
+  colors      Json?    // Ex: ["#FFF", "#000"]
+  fonts       Json?    // Ex: { primary: "Inter", secondary: "Roboto" }
+  logoUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assets        BrandAsset[]
+  socialAccounts SocialAccount[]
+  posts         Post[]
+  calendarItems CalendarItem[]
+}
+
+model BrandAsset {
+  id          String   @id @default(cuid())
+  brandId     String
+  name        String
+  type        String   // IMAGE, FONT, DOCUMENT
+  fileUrl     String
+  createdAt   DateTime @default(now())
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Social Media Integrations
+// ==========================================
+model SocialAccount {
+  id          String   @id @default(cuid())
+  brandId     String
+  platform    String   // INSTAGRAM, LINKEDIN, TWITTER
+  accountId   String
+  accessToken String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Posts & Content
+// ==========================================
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+model Post {
+  id          String     @id @default(cuid())
+  brandId     String
+  title       String?
+  status      PostStatus @default(DRAFT)
+  layoutState Json?      // JSON representando o editor visual (elementos, cores)
+  scheduledTo DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  brand         Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  captions      Caption[]
+  variants      PostVariant[]
+  calendarItems CalendarItem[]
+  scheduledJobs ScheduledJob[]
+}
+
+model PostVariant {
+  id        String   @id @default(cuid())
+  postId    String
+  platform  String   // INSTAGRAM, TWITTER etc
+  layoutOverride Json?
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Caption {
+  id        String   @id @default(cuid())
+  postId    String
+  text      String
+  isAiGenerated Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Templates Visuais
+// ==========================================
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  thumbnail   String?
+  layoutJSON  Json     // Base abstrata a ser populada no editor
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  elements TemplateElement[]
+}
+
+model TemplateElement {
+  id         String   @id @default(cuid())
+  templateId String
+  type       String   // TEXT, IMAGE, SHAPE
+  properties Json
+  
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model ContentIdea {
+  id          String   @id @default(cuid())
+  brandId     String   // Poderia vincular brand
+  topic       String
+  description String
+  isUsed      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// Calendário & Agendamento
+// ==========================================
+model CalendarItem {
+  id          String   @id @default(cuid())
+  postId      String
+  brandId     String
+  scheduledAt DateTime
+  createdAt   DateTime @default(now())
+
+  post  Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+}
+
+model ScheduledJob {
+  id          String   @id @default(cuid())
+  postId      String
+  jobId       String?  // ID do job no BullMQ
+  targetDate  DateTime
+  status      String   // PENDING, PROCESSING, COMPLETED, FAILED
+  errorLog    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Créditos e Billing (Planos)
+// ==========================================
+model Plan {
+  id            String   @id @default(cuid())
+  name          String   // FREE, PRO, AGENCY
+  price         Decimal  @default(0.0)
+  aiCreditLimit Int      @default(0)
+  createdAt     DateTime @default(now())
+  
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique // 1 sub por workspace
+  planId      String
+  status      String   // ACTIVE, CANCELED, PAST_DUE
+  currentPeriodEnd DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  plan Plan @relation(fields: [planId], references: [id])
+}
+
+model CreditWallet {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  balance     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  amount      Int      // Negativo (consumo) ou positivo (recarga)
+  description String?
+  createdAt   DateTime @default(now())
+
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+model AIRequestLog {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  provider     String   // OPENAI, ANTHROPIC, etc.
+  feature      String   // CAPTION, IDEA, REWRITE
+  promptTokens Int      @default(0)
+  completionTokens Int  @default(0)
+  costInCredits Int     @default(0)
+  createdAt    DateTime @default(now())
+}
+
+// ==========================================
+// Uploads e Auditoria
+// ==========================================
+model UploadFile {
+  id          String   @id @default(cuid())
+  workspaceId String
+  url         String
+  fileType    String
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  action      String   // CREATE_POST, DELETE_BRAND
+  entity      String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+}
