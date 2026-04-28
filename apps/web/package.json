@@ -1,20 +1,22 @@
 {
   "name": "web",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint --max-warnings 0",
-    "check-types": "next typegen && tsc --noEmit"
+    "dev": "npx next dev --port 3000",
+    "build": "npx next build",
+    "start": "npx next start",
+    "lint": "eslint --max-warnings 0"
   },
   "dependencies": {
     "@marcaflow/ui": "workspace:*",
+    "@marcaflow/utils": "workspace:*",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.0.0",
     "lucide-react": "latest",
+    "tailwind-merge": "^2.5.0",
     "zustand": "latest",
-    "next": "16.1.5",
+    "next": "15.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

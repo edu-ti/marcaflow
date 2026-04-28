@@ -3,16 +3,18 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "npx turbo dev",
+    "dev:web": "cd apps/web && npx next dev --port 3000",
+    "dev:api": "cd apps/api && npx nest start --watch",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "db:up": "docker-compose up -d",
-    "db:down": "docker-compose down",
-    "db:generate": "pnpm --filter @marcaflow/database generate",
-    "db:push": "pnpm --filter @marcaflow/database push",
-    "db:seed": "pnpm --filter @marcaflow/database seed",
-    "db:studio": "pnpm --filter @marcaflow/database studio",
-    "setup": "pnpm install && pnpm db:up && sleep 3 && pnpm db:generate && pnpm db:push && pnpm db:seed"
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "cd packages/database && npx prisma generate",
+    "db:push": "cd packages/database && npx prisma db push",
+    "db:seed": "cd packages/database && npx tsx src/seed.ts",
+    "db:studio": "cd packages/database && npx prisma studio",
+    "setup": "pnpm install && pnpm db:up && pnpm db:generate && pnpm db:push && pnpm db:seed"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
